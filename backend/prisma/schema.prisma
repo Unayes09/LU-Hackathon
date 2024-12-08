@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                Int           @id @default(autoincrement())
+  name              String
+  email             String        @unique
+  password          String
+  timezone          String
+  profession        String
+  notificationId    Int?
+  notifications     Notification[]
+  slots             Slot[]
+  meetings          Meeting[]     @relation("HostMeetings")
+  meetingClients    MeetingClient[]
+}
+
+model Slot {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  startTime   DateTime
+  endTime     DateTime
+  startDate   DateTime
+  endDate     DateTime
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  meetings    Meeting[]
+  active      Boolean
+}
+
+model Meeting {
+  id          Int      @id @default(autoincrement())
+  description String
+  startTime   DateTime
+  endTime     DateTime
+  slotId      Int
+  slot        Slot     @relation(fields: [slotId], references: [id])
+  hostId      Int
+  host        User     @relation("HostMeetings", fields: [hostId], references: [id])
+  status      Int      // 0: cancelled, 1: pending, 2: completed
+  meetingClients MeetingClient[]
+}
+
+model Notification {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  date        DateTime
+  userId      Int?
+  user        User?    @relation(fields: [userId], references: [id])
+}
+
+model MeetingClient {
+  id          Int      @id @default(autoincrement())
+  guestId     Int
+  guest       User     @relation(fields: [guestId], references: [id])
+  meetingId   Int
+  meeting     Meeting  @relation(fields: [meetingId], references: [id])
+}

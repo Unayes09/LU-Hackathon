@@ -11,6 +11,8 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@prisma/adapter-pg": "^6.0.1",
+    "@prisma/client": "^6.0.1",
     "axios": "^1.7.9",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.5.1",
@@ -25,11 +27,15 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.16",
-    "nodemon": "^3.1.7",
     "openai": "^4.76.0",
     "os": "^0.1.2",
     "path": "^0.12.7",
+    "pg": "^8.13.1",
     "sharp": "^0.33.5",
     "stripe": "^17.4.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7",
+    "prisma": "^6.0.1"
   }
 }
