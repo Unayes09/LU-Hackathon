@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const JWT_SECRET = process.env.jwt_secret_key; // Replace with a secure secret key
 const prisma = require("../db")
+const log = require("../controllers/history")
 
 // Register User
 exports.registerUser = async (req, res) => {
@@ -30,6 +31,10 @@ exports.registerUser = async (req, res) => {
       },
     });
 
+    // Log the operation
+    const details = `User ${name} creates account.`;
+    await log.logOperation("Create", "User", details);  // Log the update operation
+
     res.status(201).json({ message: "User registered successfully.", user: newUser });
   } catch (error) {
     res.status(500).json({ message: "Error registering user.", error: error.message });
@@ -40,7 +45,7 @@ exports.registerUser = async (req, res) => {
 exports.loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-    console.log(email,password)
+    //.log(email,password)
 
     // Check if the user exists
     const user = await prisma.user.findUnique({
@@ -61,8 +66,63 @@ exports.loginUser = async (req, res) => {
       expiresIn: "48h",
     });
 
-    res.status(200).json({ message: "Login successful.", token });
+    // Log the operation
+    const details = `User ${user.name} just logged in.`;
+    await log.logOperation("Login", "User", details);  // Log the update operation
+
+    res.status(200).json({ message: "Login successful.", token, user });
   } catch (error) {
     res.status(500).json({ message: "Error logging in.", error: error.message });
   }
 };
+
+// Find User by Email (Excluding Password)
+exports.findUserByEmail = async (req, res) => {
+    try {
+      const email = req.query.email; // Assuming email is passed as a URL parameter
+      console.log(email)
+      // Find user by email excluding the password
+      const user = await prisma.user.findUnique({
+        where: { email },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          timezone: true,
+          profession: true,
+          // Add other fields as necessary, but exclude 'password'
+        },
+      });
+  
+      if (!user) {
+        return res.status(404).json({ message: "User not found." });
+      }
+  
+      res.status(200).json({ user });
+    } catch (error) {
+      res.status(500).json({ message: "Error retrieving user.", error: error.message });
+    }
+  };
+
+  exports.getAllUsers = async (req, res) => {
+    try {
+      const users = await prisma.user.findMany({
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          timezone: true,
+          profession: true,
+          role: true,
+          notifications: true, // Related notifications
+          slots: true,         // Related slots
+        },
+      });
+  
+      res.status(200).json({ message: "Users fetched successfully.", users });
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching users.", error: error.message });
+    }
+  };
+  
+  

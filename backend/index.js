@@ -20,3 +20,5 @@ process.on("SIGINT", async () => {
   
 
 app.use("/auth", require("./routes/auth"));
+app.use("/slot",require("./routes/slot"));
+app.use('/meet',require('./routes/meeting'));

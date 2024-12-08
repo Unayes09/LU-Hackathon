@@ -16,10 +16,12 @@ model User {
   timezone          String
   profession        String
   notificationId    Int?
+  role String @default("User")
   notifications     Notification[]
   slots             Slot[]
   meetings          Meeting[]     @relation("HostMeetings")
   meetingClients    MeetingClient[]
+  createdAt DateTime @default(now())
 }
 
 model Slot {
@@ -39,8 +41,7 @@ model Slot {
 model Meeting {
   id          Int      @id @default(autoincrement())
   description String
-  startTime   DateTime
-  endTime     DateTime
+  date DateTime
   slotId      Int
   slot        Slot     @relation(fields: [slotId], references: [id])
   hostId      Int
@@ -64,4 +65,12 @@ model MeetingClient {
   guest       User     @relation(fields: [guestId], references: [id])
   meetingId   Int
   meeting     Meeting  @relation(fields: [meetingId], references: [id])
+}
+
+model History {
+  id         Int      @id @default(autoincrement())
+  operation  String   
+  tableName  String   
+  createdAt  DateTime @default(now()) 
+  details    String   
 }
