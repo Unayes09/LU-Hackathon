@@ -1,4 +1,5 @@
 const prisma = require("../db")
+const nodemailer = require("nodemailer");
 const log = require("../controllers/history")
 
 // Create a new meeting
@@ -14,17 +15,24 @@ exports.createMeeting = async (req, res) => {
   
       // Check if a similar meeting exists
       const existingMeeting = await prisma.meeting.findFirst({
-        where: { description, date, slotId, hostId },
-      });
-
-      const user = await prisma.user.findUnique({
-        where: { id: hostId },
+        where: { description, date: new Date(date), slotId, hostId },
       });
   
       if (existingMeeting) {
         return res
           .status(400)
           .json({ message: "Meeting with similar details already exists." });
+      }
+  
+      // Fetch the host details
+      const host = await prisma.user.findUnique({
+        where: { id: hostId },
+      });
+  
+      if (!host) {
+        return res
+          .status(404)
+          .json({ message: `Host with ID ${hostId} not found.` });
       }
   
       // Create the meeting
@@ -38,7 +46,18 @@ exports.createMeeting = async (req, res) => {
         },
       });
   
-      // Add guests to the meeting using async loop
+      // Fetch guest details by guestIds
+      const guestDetails = await prisma.user.findMany({
+        where: {
+          id: { in: guestIds },
+        },
+        select: {
+          name: true,
+          email: true,
+        },
+      });
+  
+      // Add guests to the meeting
       await Promise.all(
         guestIds.map(async (guestId) => {
           await prisma.meetingClient.create({
@@ -49,19 +68,63 @@ exports.createMeeting = async (req, res) => {
           });
         })
       );
-      
+  
+      // Compose guest names and emails for the email body
+      const guestNames = guestDetails.map((guest) => guest.name).join(", ");
+      const guestEmails = guestDetails.map((guest) => guest.email).join(", ");
+  
+      // Send email to the host
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: process.env.SMTP_EMAIL, // Your email
+          pass: process.env.SMTP_PASS, // Your email password or app password
+        },
+      });
+  
+      const mailOptions = {
+        from: "Shakkhat@gmail.com", // Sender email address
+        to: host.email, // Host's email address
+        subject: "Meeting Invitation",
+        text: `
+  Dear ${host.name},
+  
+  You have been invited to host a meeting with the following details:
+  
+  Description: ${description}
+  Date: ${date}
+  Slot ID: ${slotId}
+  
+  Guests: ${guestNames} (${guestEmails})
+  
+  Best regards,
+  Meeting Scheduler Team
+        `,
+      };
+  
+      await transporter.sendMail(mailOptions);
+  
+      // Create a notification for the host
+      const notification = await prisma.notification.create({
+        data: {
+          title: "New Meeting For You",
+          description: `You are invited to host a meeting with guests: ${guestNames}.`,
+          userId: hostId,
+        },
+      });
   
       // Log the operation
-      const details = `User ${user.name} creates a new meeting.`;
-      await log.logOperation("Create", "Meeting", details);  // Log the update operation
-
-      res
-        .status(201)
-        .json({ message: "Meeting created successfully.", meeting });
+      const details = `User ${guestNames} creates a new meeting with host: ${host.name}.`;
+      await log.logOperation("Create", "Meeting", details);
+  
+      res.status(201).json({
+        message: "Meeting created successfully, email sent, and notification saved.",
+        meeting,
+        notification,
+      });
     } catch (error) {
-      res
-        .status(500)
-        .json({ message: "Error creating meeting.", error: error.message });
+      console.error("Error creating meeting:", error);
+      res.status(500).json({ message: "Error creating meeting.", error: error.message });
     }
   };
   
@@ -223,7 +286,7 @@ exports.getMeetingsForToday = async (req, res) => {
   };
   
 
-exports.changeMeetingStatus = async (req, res) => {
+  exports.changeMeetingStatus = async (req, res) => {
     try {
       const { meetingId, status } = req.params;
       const changing_status = parseInt(status);
@@ -231,16 +294,30 @@ exports.changeMeetingStatus = async (req, res) => {
       // Validate status
       if (![0, 1, 2].includes(changing_status)) {
         return res.status(400).json({
-          message: "Invalid status. Valid values are: 0 (Cancelled), 1 (Pending), 2 (Completed).",
+          message:
+            "Invalid status. Valid values are: 0 (Cancelled), 1 (Pending), 2 (Completed).",
         });
       }
-
+  
+      // Fetch meeting details with host and guests
       const meeting = await prisma.meeting.findUnique({
         where: { id: parseInt(meetingId) },
-        include: { host: true }, // This will include the user (host) data
+        include: {
+          host: true, // Include the host details
+          meetingClients: {
+            include: {
+              guest: true, // Include the guest details
+            },
+          },
+        },
       });
-      
-      const host = meeting?.host; // Extract the host info
+  
+      if (!meeting) {
+        return res.status(404).json({ message: "Meeting not found." });
+      }
+  
+      const host = meeting.host; // Host details
+      const guests = meeting.meetingClients.map((mc) => mc.guest); // Guest details
   
       // Update the meeting status
       const updatedMeeting = await prisma.meeting.update({
@@ -248,23 +325,78 @@ exports.changeMeetingStatus = async (req, res) => {
           id: parseInt(meetingId),
         },
         data: {
-          status: changing_status, // Corrected field name
+          status: changing_status,
         },
       });
-
+  
+      // Compose email content
+      const statusMessages = {
+        0: "Cancelled",
+        1: "Pending",
+        2: "Accepted",
+      };
+      const statusText = statusMessages[changing_status];
+      const subject = `Meeting Status Updated to ${statusText}`;
+      const emailBody = `
+  Dear Guest,
+  
+  The meeting "${meeting.description}" scheduled on ${meeting.date} has been updated to the following status: ${statusText}.
+  
+  Best regards,
+  Meeting Scheduler Team
+      `;
+  
+      // Send email to all guests
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: process.env.SMTP_EMAIL,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+  
+      await Promise.all(
+        guests.map(async (guest) => {
+          const mailOptions = {
+            from: "Shakkhat@gmail.com",
+            to: guest.email,
+            subject,
+            text: emailBody,
+          };
+          await transporter.sendMail(mailOptions);
+        })
+      );
+  
+      // Save notifications for all guests
+      await Promise.all(
+        guests.map(async (guest) => {
+          await prisma.notification.create({
+            data: {
+              title: `Meeting Status Updated`,
+              description: `The meeting "${meeting.description}" is now ${statusText}.`,
+              userId: guest.id,
+            },
+          });
+        })
+      );
+  
       // Log the operation
-      const details = `User ${host.name} update meeting status.`;
-      await log.logOperation("Update", "Meeting", details);  // Log the update operation
+      const details = `User ${host.name} updated meeting status to ${statusText}.`;
+      await log.logOperation("Update", "Meeting", details);
   
       res.status(200).json({
-        message: "Meeting status updated successfully.",
+        message: "Meeting status updated successfully, emails sent, and notifications created.",
         meeting: updatedMeeting,
       });
     } catch (error) {
-      res.status(500).json({ message: "Error updating meeting status.", error: error.message });
+      console.error("Error updating meeting status:", error);
+      res.status(500).json({
+        message: "Error updating meeting status.",
+        error: error.message,
+      });
     }
   };
-
+  
   exports.getMeetingsBySlotId = async (req, res) => {
     try {
       const { slotId } = req.params;

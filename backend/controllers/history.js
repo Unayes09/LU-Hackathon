@@ -37,4 +37,38 @@ exports.logOperation = async (operation, tableName, details) => {
       });
     }
   };
+
+  exports.getUserNotifications = async (req, res) => {
+    try {
+      const { userId } = req.params;
+  
+      // Fetch notifications for the user
+      const notifications = await prisma.notification.findMany({
+        where: {
+          userId: parseInt(userId),
+        },
+        orderBy: {
+          createdAt: "desc", // Sort by most recent first
+        },
+      });
+  
+      if (!notifications.length) {
+        return res.status(404).json({
+          message: `No notifications found for user with ID ${userId}.`,
+        });
+      }
+  
+      res.status(200).json({
+        message: "Notifications fetched successfully.",
+        notifications,
+      });
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      res.status(500).json({
+        message: "Error fetching notifications.",
+        error: error.message,
+      });
+    }
+  };
+  
   

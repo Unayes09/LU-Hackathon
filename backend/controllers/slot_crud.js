@@ -81,7 +81,11 @@ exports.createSlot = async (req, res) => {
 // Get all slots
 exports.getAllSlots = async (req, res) => {
     try {
-      const slots = await prisma.slot.findMany();
+      const slots = await prisma.slot.findMany({
+        include: {
+            user: true,
+        }
+      });
       res.status(200).json(slots);
     } catch (error) {
       res.status(500).json({ message: "Error fetching slots.", error: error.message });
@@ -95,6 +99,10 @@ exports.getSlotById = async (req, res) => {
   
       const slot = await prisma.slot.findUnique({
         where: { id: parseInt(id) },
+            include: {
+                user: true,
+            }
+          
       });
   
       if (!slot) {
@@ -116,10 +124,6 @@ exports.getSlotsByUser = async (req, res) => {
       const slots = await prisma.slot.findMany({
         where: { userId: parseInt(id) },
       });
-  
-      if (slots.length === 0) {
-        return res.status(404).json({ message: "No slots found for this user." });
-      }
   
       res.status(200).json(slots);
     } catch (error) {
