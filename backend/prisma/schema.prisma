@@ -15,7 +15,7 @@ model User {
   password          String
   timezone          String
   profession        String
-  notificationId    Int?
+  notificationId    String?
   role String @default("User")
   notifications     Notification[]
   slots             Slot[]
@@ -42,6 +42,8 @@ model Meeting {
   id          Int      @id @default(autoincrement())
   description String
   date DateTime
+  start_time DateTime?
+  end_time DateTime?
   slotId      Int
   slot        Slot     @relation(fields: [slotId], references: [id])
   hostId      Int

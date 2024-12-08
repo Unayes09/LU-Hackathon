@@ -114,6 +114,7 @@ exports.findUserByEmail = async (req, res) => {
           timezone: true,
           profession: true,
           role: true,
+          createdAt: true,
           notifications: true, // Related notifications
           slots: true,         // Related slots
         },
@@ -125,4 +126,48 @@ exports.findUserByEmail = async (req, res) => {
     }
   };
   
+  
+  exports.updateNotificationId = async (req, res) => {
+    try {
+      const { userId, notificationId } = req.body;
+  
+      // Validate input
+      if (!userId || !notificationId) {
+        return res.status(400).json({
+          message: "User ID and Notification ID are required.",
+        });
+      }
+  
+      // Parse userId to an integer
+      const userIdInt = parseInt(userId);
+  
+      if (isNaN(userIdInt)) {
+        return res.status(400).json({
+          message: "Invalid User ID. It must be a valid number.",
+        });
+      }
+  
+      // Update the user's notificationId
+      const updatedUser = await prisma.user.update({
+        where: {
+          id: userIdInt,
+        },
+        data: {
+          notificationId,
+        },
+      });
+  
+      // Return success response
+      res.status(200).json({
+        message: "Notification ID updated successfully.",
+        user: updatedUser,
+      });
+    } catch (error) {
+      console.error("Error updating notification ID:", error);
+      res.status(500).json({
+        message: "Error updating notification ID.",
+        error: error.message,
+      });
+    }
+  };
   

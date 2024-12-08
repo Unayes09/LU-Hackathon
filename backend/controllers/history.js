@@ -16,3 +16,25 @@ exports.logOperation = async (operation, tableName, details) => {
     }
   };
   
+
+  exports.getAllHistory = async (req, res) => {
+    try {
+      // Fetch all history data
+      const historyData = await prisma.history.findMany({
+        orderBy: {
+          createdAt: 'desc', // Optional: sorts the results by the creation date (newest first)
+        },
+      });
+  
+      res.status(200).json({
+        message: "History data fetched successfully.",
+        history: historyData,
+      });
+    } catch (error) {
+      res.status(500).json({
+        message: "Error fetching history data.",
+        error: error.message,
+      });
+    }
+  };
+  

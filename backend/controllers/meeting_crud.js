@@ -74,6 +74,7 @@ exports.getAllMeetings = async (req, res) => {
     const meetings = await prisma.meeting.findMany({
       include: {
         meetingClients: true, // Include meeting guests
+        host: true,
       },
     });
 
@@ -163,46 +164,64 @@ exports.getMeetingsByHost = async (req, res) => {
 };
 
 
-exports.getMeetingsForDates = async (req, res) => {
-  try {
-    const { date, userId } = req.params;
-    const startDate = new Date(date);
+exports.getMeetingsForToday = async (req, res) => {
+    try {
+      // Retrieve the logged-in user's ID from the request (assuming userId is available in req.user or req.body)
+      const { userId } = req.params;
+  
+      if (!userId) {
+        return res.status(401).json({
+          message: "Unauthorized: User ID is required to fetch meetings.",
+        });
+      }
+  
+      // Get the current date
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to the start of the day
 
-    // Create an array of the next 5 consecutive dates
-    const dates = Array.from({ length: 7 }, (_, i) => {
-      const newDate = new Date(startDate);
-      newDate.setDate(startDate.getDate() + i);
-      return newDate.toISOString().split("T")[0]; // Format as YYYY-MM-DD
-    });
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1); // Set to the start of the next day
 
-    // Fetch meetings for the 5 days and filter by userId
+    // Fetch meetings for the current day where the date matches
     const meetings = await prisma.meeting.findMany({
       where: {
-        date: {
-          gte: new Date(dates[0]), // First day
-          lt: new Date(dates[6]), // Up to the fifth day
-        },
-        hostId: parseInt(userId), // Match the userId
+        AND: [
+          {
+            date: {
+              gte: today,   // Greater than or equal to the start of today
+              lt: tomorrow, // Less than the start of tomorrow
+            },
+          },
+          {
+            hostId: parseInt(userId), // Match the logged-in user's ID
+          },
+        ],
       },
       include: {
-        slot: true, // Include associated slot information
-        meetingClients: true, // Include meeting clients
-      },
+        slot: true, // Include related slot details
+        host: true, // Include related host details if needed
+      }
     });
-
-    // Group meetings by each day
-    const groupedMeetings = dates.reduce((result, currentDate) => {
-      result[currentDate] = meetings.filter(meeting =>
-        new Date(meeting.date).toISOString().split("T")[0] === currentDate
-      );
-      return result;
-    }, {});
-
-    res.status(200).json({ message: "Meetings fetched successfully.", groupedMeetings });
-  } catch (error) {
-    res.status(500).json({ message: "Error fetching meetings.", error: error.message });
-  }
-};
+  
+      if (meetings.length === 0) {
+        return res.status(404).json({
+          message: "No meetings found for today.",
+        });
+      }
+  
+      res.status(200).json({
+        message: "Meetings fetched successfully.",
+        meetings,
+      });
+    } catch (error) {
+      console.error("Error fetching meetings:", error);
+      res.status(500).json({
+        message: "Error fetching meetings.",
+        error: error.message,
+      });
+    }
+  };
+  
 
 exports.changeMeetingStatus = async (req, res) => {
     try {

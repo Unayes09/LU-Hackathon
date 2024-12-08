@@ -173,6 +173,12 @@ exports.updateSlot = async (req, res) => {
           message: "The updated slot time conflicts with another active slot. Please choose a different time.",
         });
       }
+
+      const user = await prisma.user.findUnique({
+        where: {
+          id: parseInt(userId), // Find the user by id
+        },
+      });
   
       // Update the slot if no conflict is found
       const updatedSlot = await prisma.slot.update({
@@ -188,6 +194,10 @@ exports.updateSlot = async (req, res) => {
           active
         },
       });
+
+      // Log the operation
+      const details = `User ${user.name} updates a slot.`;
+      await log.logOperation("Update", "Slot", details);  // Log the update operation
   
       res.status(200).json({ message: "Slot updated successfully.", slot: updatedSlot });
     } catch (error) {
@@ -199,36 +209,53 @@ exports.updateSlot = async (req, res) => {
   exports.getSlotsForDates = async (req, res) => {
     try {
       const { date, userId } = req.params;
+  
+      // Calculate start and end dates for the 7-day range
       const startDate = new Date(date);
+      const endDate = new Date(date);
+      endDate.setDate(endDate.getDate() + 6); // 7-day range including the start date
   
-      // Create an array of the next 5 consecutive dates
-      const dates = Array.from({ length: 7 }, (_, i) => {
-        const newDate = new Date(startDate);
-        newDate.setDate(startDate.getDate() + i);
-        return newDate.toISOString().split("T")[0]; // Format as YYYY-MM-DD
-      });
+      //console.log("Start Date:", startDate);
+      //console.log("End Date:", endDate);
   
-      // Fetch slots for the 5 days and filter by userId
+      // Fetch slots within the 7-day range
       const slots = await prisma.slot.findMany({
         where: {
-          startDate: {
-            gte: new Date(dates[0]), // First day
-            lt: new Date(dates[6]), // Up to the fifth day
-          },
-          userId: parseInt(userId), // Match the userId
+          OR: [
+            {
+              startDate: {
+                lte: endDate, // Start date is before or equal to the end of the range
+              },
+              endDate: {
+                gte: startDate, // End date is after or equal to the start of the range
+              },
+            },
+          ],
+          ...(userId && { userId: parseInt(userId) }), // Filter by userId if provided
         },
       });
   
-      // Group slots by each day
+      //console.log("Slots fetched:", slots);
+  
+      // Create an array of all dates between the start and end date
+      const dates = [];
+      for (let currentDate = new Date(startDate); currentDate <= endDate; currentDate.setDate(currentDate.getDate() + 1)) {
+        dates.push(new Date(currentDate).toISOString().split("T")[0]); // Format as YYYY-MM-DD
+      }
+  
+      // Group slots by each date
       const groupedSlots = dates.reduce((result, currentDate) => {
-        result[currentDate] = slots.filter(slot =>
-          new Date(slot.startDate).toISOString().split("T")[0] === currentDate
-        );
+        result[currentDate] = slots.filter(slot => {
+          const slotStartDate = new Date(slot.startDate).toISOString().split("T")[0];
+          const slotEndDate = new Date(slot.endDate).toISOString().split("T")[0];
+          return currentDate >= slotStartDate && currentDate <= slotEndDate;
+        });
         return result;
       }, {});
   
       res.status(200).json({ message: "Slots fetched successfully.", groupedSlots });
     } catch (error) {
+      console.error("Error fetching slots:", error);
       res.status(500).json({ message: "Error fetching slots.", error: error.message });
     }
   };
