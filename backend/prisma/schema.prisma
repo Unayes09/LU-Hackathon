@@ -36,6 +36,7 @@ model Slot {
   user        User     @relation(fields: [userId], references: [id])
   meetings    Meeting[]
   active      Boolean
+  recurring   Boolean @default(false)
 }
 
 model Meeting {

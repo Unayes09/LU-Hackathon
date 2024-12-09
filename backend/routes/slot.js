@@ -8,5 +8,6 @@ router.get('/single/:id',slotController.getSlotById)
 router.get('/user/:id',slotController.getSlotsByUser)
 router.put('/update',slotController.updateSlot)
 router.get('/date/:date/user/:userId',slotController.getSlotsForDates)
+router.put('/delete',slotController.deleteSlot)
 
 module.exports = router;

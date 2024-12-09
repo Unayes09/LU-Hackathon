@@ -5,7 +5,7 @@ const log = require("../controllers/history")
 // Create a new slot
 exports.createSlot = async (req, res) => {
     try {
-      const { title, description, startTime, endTime, startDate, endDate, userId } = req.body;
+      const { title, description, startTime, endTime, startDate, endDate, userId, recurring } = req.body;
   
       // Convert string dates to Date objects
       const start = new Date(startTime);
@@ -39,11 +39,11 @@ exports.createSlot = async (req, res) => {
         },
       });
   
-      if (existingSlot) {
-        return res.status(400).json({
-          message: "User already has a slot in this time range. Please choose another time.",
-        });
-      }
+    //   if (existingSlot) {
+    //     return res.status(400).json({
+    //       message: "User already has a slot in this time range. Please choose another time.",
+    //     });
+    //   }
 
       const user = await prisma.user.findUnique({
         where: {
@@ -64,6 +64,7 @@ exports.createSlot = async (req, res) => {
           endDate: endD,
           userId,
           active: true,
+          recurring: recurring?true:false
         },
       });
 
@@ -237,6 +238,9 @@ exports.updateSlot = async (req, res) => {
           ],
           ...(userId && { userId: parseInt(userId) }), // Filter by userId if provided
         },
+        include:{
+            meetings:true
+        }
       });
   
       //console.log("Slots fetched:", slots);
@@ -264,5 +268,34 @@ exports.updateSlot = async (req, res) => {
     }
   };
   
+  exports.deleteSlot = async (req, res) => {
+    try {
+      const { id } = req.body;
+
+      const slot = await prisma.slot.findFirst({
+        where: {
+            id
+        },
+        include: {
+            user:true,
+        }
+      })
   
+      // Update the slot if no conflict is found
+      const updatedSlot = await prisma.slot.update({
+        where: { id },
+        data: {
+          active:false
+        },
+      });
+
+      // Log the operation
+      const details = `User ${slot.user.name} deletes a slot.`;
+      await log.logOperation("Delete", "Slot", details);  // Log the update operation
+  
+      res.status(200).json({ message: "Slot updated successfully.", slot: updatedSlot });
+    } catch (error) {
+      res.status(500).json({ message: "Error updating slot.", error: error.message });
+    }
+  };
   

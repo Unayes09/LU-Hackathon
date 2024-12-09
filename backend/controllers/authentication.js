@@ -104,6 +104,31 @@ exports.findUserByEmail = async (req, res) => {
     }
   };
 
+  exports.findUserByUserId = async (req, res) => {
+    try {
+      const id = parseInt(req.params.id); 
+      const user = await prisma.user.findFirst({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          timezone: true,
+          profession: true,
+          // Add other fields as necessary, but exclude 'password'
+        },
+      });
+  
+      if (!user) {
+        return res.status(404).json({ message: "User not found." });
+      }
+  
+      res.status(200).json({ user });
+    } catch (error) {
+      res.status(500).json({ message: "Error retrieving user.", error: error.message });
+    }
+  };
+
   exports.getAllUsers = async (req, res) => {
     try {
       const users = await prisma.user.findMany({

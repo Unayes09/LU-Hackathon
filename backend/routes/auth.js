@@ -9,6 +9,7 @@ router.get('/profile',authController.findUserByEmail)
 router.get('/users',authController.getAllUsers)
 router.get('/history',histController.getAllHistory)
 router.put('/nid',authController.updateNotificationId)
+router.get('/user/:id',authController.findUserByUserId)
 router.get('/nt/:userId',histController.getUserNotifications)
 
 module.exports = router;
