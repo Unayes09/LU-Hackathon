@@ -50,7 +50,7 @@ This repository hosts the backend APIs for Shakkhat, including endpoints for man
 ## Database Schema
 
 Here’s an overview of the database schema used for Shakkhat:  
-![Database Schema](./path-to-your-database-schema-image.png)
+![Database Schema](https://github.com/Unayes09/LU-Hackathon/blob/main/Supbase%20Schema.png)
 
 ---
 
