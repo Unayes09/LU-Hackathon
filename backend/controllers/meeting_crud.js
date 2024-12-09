@@ -289,6 +289,7 @@ exports.getMeetingsForToday = async (req, res) => {
   exports.changeMeetingStatus = async (req, res) => {
     try {
       const { meetingId, status } = req.params;
+      const { start_time, end_time } = req.body;
       const changing_status = parseInt(status);
   
       // Validate status
@@ -325,6 +326,8 @@ exports.getMeetingsForToday = async (req, res) => {
           id: parseInt(meetingId),
         },
         data: {
+          start_time: start_time,
+          end_time: end_time,
           status: changing_status,
         },
       });
